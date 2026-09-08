@@ -1,0 +1,136 @@
+import bcrypt from "bcrypt"
+import crypto from "crypto"
+import { prisma } from "../prisma"
+
+const EMAIL_VERIFICATION_TOKEN_TTL = 24 * 60 * 60 * 1000
+const PASSWORD_RESET_TOKEN_TTL = 60 * 60 * 1000
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION = 15 * 60 * 1000
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12)
+}
+
+export async function comparePassword(password: string, hashed: string): Promise<boolean> {
+  return bcrypt.compare(password, hashed)
+}
+
+export function generateToken(): string {
+  return crypto.randomBytes(32).toString("hex")
+}
+
+export async function createVerificationToken(userId: string): Promise<string> {
+  const token = generateToken()
+  const tokenHash = await bcrypt.hash(token, 12)
+  const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL)
+
+  await prisma.verificationToken.create({
+    data: { tokenHash, expiresAt, userId }
+  })
+
+  return token
+}
+
+export async function createPasswordResetToken(userId: string): Promise<string> {
+  const token = generateToken()
+  const tokenHash = await bcrypt.hash(token, 12)
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL)
+
+  await prisma.passwordResetToken.create({
+    data: { tokenHash, expiresAt, userId }
+  })
+
+  return token
+}
+
+export async function verifyToken(
+  token: string,
+  tokenModel: "verification" | "passwordReset"
+): Promise<{ valid: boolean; userId?: string }> {
+  const now = new Date()
+
+  if (tokenModel === "verification") {
+    const tokens = await prisma.verificationToken.findMany({
+      where: { usedAt: null, expiresAt: { gt: now } }
+    })
+
+    for (const t of tokens) {
+      const isValid = await bcrypt.compare(token, t.tokenHash)
+      if (isValid) {
+        await prisma.verificationToken.update({
+          where: { id: t.id },
+          data: { usedAt: now }
+        })
+        return { valid: true, userId: t.userId }
+      }
+    }
+  } else {
+    const tokens = await prisma.passwordResetToken.findMany({
+      where: { usedAt: null, expiresAt: { gt: now } }
+    })
+
+    for (const t of tokens) {
+      const isValid = await bcrypt.compare(token, t.tokenHash)
+      if (isValid) {
+        await prisma.passwordResetToken.update({
+          where: { id: t.id },
+          data: { usedAt: now }
+        })
+        return { valid: true, userId: t.userId }
+      }
+    }
+  }
+
+  return { valid: false }
+}
+
+export async function checkSignThrottle(
+  ip: string
+): Promise<{ canSignUp: boolean; message?: string }> {
+  const now = new Date()
+  const windowStart = new Date(now.getTime() - 60 * 60 * 1000)
+
+  const existing = await prisma.signThrottle.findFirst({
+    where: { ip, createdAt: { gt: windowStart } }
+  })
+
+  if (!existing) {
+    await prisma.signThrottle.create({
+      data: { ip, count: 1, resetAt: new Date(now.getTime() + 60 * 60 * 1000) }
+    })
+    return { canSignUp: true }
+  }
+
+  if (existing.count >= 5) {
+    return { canSignUp: false, message: "Terlalu banyak percobaan, coba lagi nanti" }
+  }
+
+  await prisma.signThrottle.update({
+    where: { id: existing.id },
+    data: { count: existing.count + 1 }
+  })
+
+  return { canSignUp: true }
+}
+
+export async function recordLoginAttempt(
+  userId: string,
+  success: boolean,
+  ip?: string
+): Promise<void> {
+  await prisma.loginAttempt.create({
+    data: { userId, success, ip: ip || null }
+  })
+}
+
+export async function isAccountLocked(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { emailVerifiedAt: true }
+  })
+
+  if (!user?.emailVerifiedAt) return false
+
+  return false
+}
+
