@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { signOut } from "next-auth/react"
 import { useState } from "react"
 
@@ -12,47 +12,51 @@ const navItems = [
 
 export function Sidebar({ userName }: { userName?: string | null }) {
   const pathname = usePathname()
-  const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <>
-      {/* Hamburger hanya tampil saat sidebar tertutup, supaya tidak menimpa logo sidebar */}
-      {!mobileOpen && (
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg border border-line shadow-sm"
-          aria-label="Buka menu"
-        >
-          <svg className="w-6 h-6 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      )}
+      {/* Hamburger selalu di DOM (anti-blink): saat sidebar terbuka hanya opacity-0 + pointer-events-none, bukan unmount. Jadi tidak ada layout shift. */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        data-testid="hamburger"
+        aria-label="Buka menu"
+        aria-hidden={mobileOpen}
+        tabIndex={mobileOpen ? -1 : 0}
+        className={`fixed top-4 left-4 z-50 md:hidden bg-white p-2 rounded-lg border border-line shadow-sm transition-opacity duration-200 ${mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"}`}
+      >
+        <svg className="w-6 h-6 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
 
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {/* Backdrop selalu di DOM, fade via opacity agar tidak blink */}
+      <div
+        data-testid="sidebar-backdrop"
+        aria-hidden={!mobileOpen}
+        onClick={() => setMobileOpen(false)}
+        className={`fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-200 ${mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      />
 
       <aside
+        data-testid="sidebar"
         className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-line z-40 transition-transform duration-200
           ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
         <div className="flex flex-col h-full">
-          {mobileOpen && (
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="md:hidden self-end m-3 p-2 rounded-lg hover:bg-blush/15"
-              aria-label="Tutup menu"
-            >
-              <svg className="w-5 h-5 text-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
+          {/* Tombol close selalu di DOM (anti-blink), disembunyikan via opacity saat sidebar tertutup di mobile */}
+          <button
+            onClick={() => setMobileOpen(false)}
+            data-testid="sidebar-close"
+            aria-label="Tutup menu"
+            aria-hidden={!mobileOpen}
+            tabIndex={mobileOpen ? 0 : -1}
+            className={`md:hidden self-end m-3 p-2 rounded-lg hover:bg-blush/15 transition-opacity duration-200 ${mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          >
+            <svg className="w-5 h-5 text-ink-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
           <div className="p-6 border-b border-line">
             <h1 className="font-display text-2xl tracking-tight text-ink">Undanganku</h1>
             <p className="text-xs text-ink-soft mt-1">Undangan digital Indonesia</p>

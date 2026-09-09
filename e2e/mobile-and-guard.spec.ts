@@ -1,9 +1,9 @@
-import { test, expect, Page } from "@playwright/test"
+import { test, expect } from "@playwright/test"
 
 test.describe("Mobile + access control", () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test("mobile: hamburger opens sidebar without overlapping logo", async ({ page }) => {
+  test("mobile: hamburger opens sidebar without blink (stays mounted, fades via opacity)", async ({ page }) => {
     await page.goto("/sign-in")
     await page.fill("#email", "admin@example.com")
     await page.fill("#password", "admin123")
@@ -12,28 +12,53 @@ test.describe("Mobile + access control", () => {
       page.click("button[type=submit]"),
     ])
     await expect(page).toHaveURL(/.*dashboard/)
-
-    // heading konten visible
     await expect(page.getByRole("heading", { name: "Undangan Saya" })).toBeVisible()
 
-    const hamburger = page.locator("button[aria-label=\"Buka menu\"]")
-    await expect(hamburger).toBeVisible()
+    const hamburger = page.getByTestId("hamburger")
+    const backdrop = page.getByTestId("sidebar-backdrop")
+    const close = page.getByTestId("sidebar-close")
+    const aside = page.getByTestId("sidebar")
 
-    // sidebar hidden awal
-    await expect(page.locator("aside")).not.toBeInViewport()
+    // Semua kontrol selalu di DOM (anti-blink). Playwright menganggap opacity-0
+    // tetap "visible", jadi state dibuktikan lewat class + aria-hidden.
+    await expect(hamburger).toBeAttached()
+    await expect(backdrop).toBeAttached()
+    await expect(close).toBeAttached()
 
-    // buka menu
+    // Keadaan tertutup
+    await expect(aside).not.toBeInViewport()
+    await expect(hamburger).toHaveClass(/opacity-100/)
+    await expect(hamburger).toHaveAttribute("aria-hidden", "false")
+    await expect(backdrop).toHaveClass(/opacity-0/)
+    await expect(backdrop).toHaveAttribute("aria-hidden", "true")
+    await expect(close).toHaveClass(/opacity-0/)
+    await expect(close).toHaveAttribute("aria-hidden", "true")
+
+    // Buka menu
     await hamburger.click()
-    const aside = page.locator("aside")
     await expect(aside).toBeInViewport()
 
-    // logo "Undanganku" di sidebar terlihat & tidak tertutup (hamburger disembunyikan saat terbuka)
+    // Hamburger memudar tanpa unmount (tanpa layout shift); logo tidak tertutup
+    await expect(hamburger).toHaveClass(/opacity-0/)
+    await expect(hamburger).toHaveAttribute("aria-hidden", "true")
     await expect(page.getByText("Undanganku").first()).toBeVisible()
-    // hamburger menghilang saat sidebar terbuka (supaya tidak menutupi logo)
-    await expect(hamburger).not.toBeVisible()
+    await expect(backdrop).toHaveClass(/opacity-100/)
+    await expect(backdrop).toHaveAttribute("aria-hidden", "false")
+    await expect(close).toHaveClass(/opacity-100/)
+    await expect(close).toBeVisible()
 
-    // tombol tutup ada
-    await expect(page.getByRole("button", { name: "Tutup menu" })).toBeVisible()
+    // Tutup via tombol close
+    await close.click()
+    await expect(aside).not.toBeInViewport()
+    await expect(hamburger).toHaveClass(/opacity-100/)
+    await expect(backdrop).toHaveClass(/opacity-0/)
+
+    // Buka lagi, tutup via backdrop
+    await hamburger.click()
+    await expect(aside).toBeInViewport()
+    await backdrop.click()
+    await expect(aside).not.toBeInViewport()
+    await expect(hamburger).toHaveClass(/opacity-100/)
   })
 
   test("regular user can sign in and reach dashboard", async ({ page }) => {
@@ -56,5 +81,10 @@ test.describe("Mobile + access control", () => {
     ])
     await expect(page).toHaveURL(/.*dashboard/)
     await expect(page.getByRole("heading", { name: "Undangan Saya" })).toBeVisible()
+  })
+
+  test("guest hitting /dashboard/templates is sent to sign-in", async ({ page }) => {
+    await page.goto("/dashboard/templates")
+    await expect(page).toHaveURL(/.*sign-in/, { timeout: 10000 })
   })
 })
