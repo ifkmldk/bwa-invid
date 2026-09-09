@@ -24,6 +24,8 @@ export async function createVerificationToken(userId: string): Promise<string> {
   const tokenHash = await bcrypt.hash(token, 12)
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL)
 
+  // userId unik: hapus yang lama (misal resend verification)
+  await prisma.verificationToken.deleteMany({ where: { userId } })
   await prisma.verificationToken.create({
     data: { tokenHash, expiresAt, userId }
   })
@@ -36,6 +38,8 @@ export async function createPasswordResetToken(userId: string): Promise<string> 
   const tokenHash = await bcrypt.hash(token, 12)
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL)
 
+  // userId unik: hapus yang lama sebelum buat baru (regenerasi)
+  await prisma.passwordResetToken.deleteMany({ where: { userId } })
   await prisma.passwordResetToken.create({
     data: { tokenHash, expiresAt, userId }
   })
@@ -133,14 +137,20 @@ export async function recordLoginAttempt(
 }
 
 export async function isAccountLocked(userId: string): Promise<boolean> {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { emailVerifiedAt: true }
+  // Lockout 15 menit jika >= 5 percobaan gagal berurutan dalam window
+  const now = new Date()
+  const windowStart = new Date(now.getTime() - 15 * 60 * 1000)
+
+  const failures = await prisma.loginAttempt.count({
+    where: {
+      userId,
+      success: false,
+      createdAt: { gt: windowStart }
+    }
   })
 
-  if (!user?.emailVerifiedAt) return false
-
-  return false
+  return failures >= 5
 }
+
 
 
