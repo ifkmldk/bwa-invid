@@ -23,12 +23,14 @@ export async function POST(request: Request) {
 
     const resetToken = await createPasswordResetToken(user.id)
 
-    // Send reset email (dev: console)
     console.log(`[DEV] Reset link: http://localhost:3000/reset-password?token=${resetToken}`)
 
-    return NextResponse.json({ message: "Tautan reset kata sandi dikirim" }, { status: 200 })
+    return NextResponse.json({
+      message: "Tautan reset kata sandi dikirim",
+      // Di development, kembalikan token supaya alur reset bisa diuji end-to-end
+      resetToken: process.env.NODE_ENV !== "production" ? resetToken : undefined,
+    }, { status: 200 })
   } catch (error) {
     return NextResponse.json({ error: "Gagal mengirim tautan reset" }, { status: 500 })
   }
 }
-
