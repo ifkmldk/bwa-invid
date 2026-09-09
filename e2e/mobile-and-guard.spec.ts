@@ -3,7 +3,7 @@ import { test, expect, Page } from "@playwright/test"
 test.describe("Mobile + access control", () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test("mobile: sidebar hidden, hamburger opens it, heading visible", async ({ page }) => {
+  test("mobile: hamburger opens sidebar without overlapping logo", async ({ page }) => {
     await page.goto("/sign-in")
     await page.fill("#email", "admin@example.com")
     await page.fill("#password", "admin123")
@@ -13,21 +13,27 @@ test.describe("Mobile + access control", () => {
     ])
     await expect(page).toHaveURL(/.*dashboard/)
 
-    // heading visible (tidak tertutup top menu)
+    // heading konten visible
     await expect(page.getByRole("heading", { name: "Undangan Saya" })).toBeVisible()
 
-    // hamburger visible via css selector
-    const hamburger = page.locator('button[aria-label="Buka menu"]')
+    const hamburger = page.locator("button[aria-label=\"Buka menu\"]")
     await expect(hamburger).toBeVisible()
 
-    // sidebar tersembunyi (translated off-canvas)
-    const aside = page.locator("aside")
-    await expect(aside).not.toBeInViewport()
+    // sidebar hidden awal
+    await expect(page.locator("aside")).not.toBeInViewport()
 
     // buka menu
     await hamburger.click()
+    const aside = page.locator("aside")
     await expect(aside).toBeInViewport()
+
+    // logo "Undanganku" di sidebar terlihat & tidak tertutup (hamburger disembunyikan saat terbuka)
     await expect(page.getByText("Undanganku").first()).toBeVisible()
+    // hamburger menghilang saat sidebar terbuka (supaya tidak menutupi logo)
+    await expect(hamburger).not.toBeVisible()
+
+    // tombol tutup ada
+    await expect(page.getByRole("button", { name: "Tutup menu" })).toBeVisible()
   })
 
   test("regular user can sign in and reach dashboard", async ({ page }) => {
