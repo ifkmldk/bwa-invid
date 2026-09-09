@@ -28,6 +28,10 @@ interface WizardData {
     accountNumber: string
     accountName: string
   }>
+  gallery: Array<{
+    url: string
+    caption: string
+  }>
 }
 
 interface WizardContextType {
@@ -36,6 +40,7 @@ interface WizardContextType {
   currentStep: number
   setCurrentStep: (step: number) => void
   saveStatus: "idle" | "saving" | "saved" | "error"
+  validateStep: (step: number) => string[]
   invitationId: string
   themeConfig: any
   templateName: string
@@ -60,6 +65,7 @@ const defaultData: WizardData = {
   events: [{ title: "Akad Nikah", date: "", timeStart: "", timeEnd: "", location: "", address: "", mapsUrl: "" }],
   loveStory: [],
   gifts: [],
+  gallery: [],
 }
 
 export function WizardProvider({
@@ -106,6 +112,12 @@ export function WizardProvider({
             ? JSON.parse(initialData.gifts)
             : initialData.gifts
           : [],
+        gallery: initialData.galleryPhotos
+          ? initialData.galleryPhotos.map((g: any) => ({
+              url: g.url || "",
+              caption: g.caption || "",
+            }))
+          : [],
       }
     }
     return defaultData
@@ -120,6 +132,20 @@ export function WizardProvider({
   })
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+
+  const validateStep = useCallback((step: number): string[] => {
+    if (step === 0) {
+      const errors: string[] = []
+      if (!data.groomName.trim()) errors.push("Nama mempelai pria wajib diisi")
+      if (!data.brideName.trim()) errors.push("Nama mempelai wanita wajib diisi")
+      return errors
+    }
+    if (step === 1) {
+      const ok = data.events.some((e) => e.title.trim() && e.date)
+      return ok ? [] : ["Minimal satu acara harus punya judul dan tanggal"]
+    }
+    return []
+  }, [data])
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const saveServerRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -165,7 +191,7 @@ export function WizardProvider({
 
   return (
     <WizardContext.Provider
-      value={{ data, updateData, currentStep, setCurrentStep, saveStatus, invitationId, themeConfig, templateName }}
+      value={{ data, updateData, currentStep, setCurrentStep, saveStatus, validateStep, invitationId, themeConfig, templateName }}
     >
       {children}
     </WizardContext.Provider>

@@ -47,6 +47,25 @@ export function WizardPreview() {
           </div>
         ))}
 
+        {data.gallery.length > 0 && (
+          <>
+            <div className="border-t pt-4" style={{ borderColor: theme.accentColor || "#E5DDD2" }} />
+            <h3 className="font-semibold text-sm text-center" style={{ color: theme.textColor || "#2E2A26" }}>
+              Galeri
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              {data.gallery.map((photo, i) => (
+                <img
+                  key={i}
+                  src={photo.url}
+                  alt={photo.caption || `Foto ${i + 1}`}
+                  className="w-full h-20 object-cover rounded-lg"
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         {data.loveStory.length > 0 && (
           <>
             <div className="border-t pt-4" style={{ borderColor: theme.accentColor || "#E5DDD2" }} />

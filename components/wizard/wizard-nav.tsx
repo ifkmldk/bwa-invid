@@ -18,7 +18,7 @@ export function WizardNav() {
     switch (index) {
       case 0: return !!(data.groomName && data.brideName)
       case 1: return data.events.length > 0 && data.events.some((e) => e.title && e.date)
-      case 2: return false
+      case 2: return data.gallery.length > 0
       case 3: return data.loveStory.length > 0
       case 4: return data.gifts.length > 0
       case 5: return false

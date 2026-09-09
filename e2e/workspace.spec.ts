@@ -48,6 +48,9 @@ test.describe("Invitation Workspace (Issue #2)", () => {
     for (const label of ["Data Pasangan", "Detail Acara", "Galeri", "Cerita Cinta", "Hadiah", "Pengaturan"]) {
       await expect(page.getByText(label).first()).toBeVisible()
     }
+    const names = page.locator('input[placeholder="Nama lengkap"]')
+    await names.first().fill("Budi")
+    await names.nth(1).fill("Anisa")
     await page.getByRole("button", { name: "Selanjutnya" }).click()
     await expect(page.getByRole("heading", { name: "Detail Acara" })).toBeVisible()
   })

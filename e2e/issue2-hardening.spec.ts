@@ -71,7 +71,13 @@ test.describe("Issue #2 hardening — draft builder", () => {
     for (const label of ["Data Pasangan", "Detail Acara", "Galeri", "Cerita Cinta", "Hadiah", "Pengaturan"]) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 8000 })
     }
-    for (let i = 0; i < 5; i++) {
+    const names = page.locator('input[placeholder="Nama lengkap"]')
+    await names.first().fill("Budi")
+    await names.nth(1).fill("Anisa")
+    await page.getByRole("button", { name: "Selanjutnya" }).click()
+    await expect(page.getByRole("heading", { name: "Detail Acara" })).toBeVisible({ timeout: 8000 })
+    await page.locator('input[type="date"]').first().fill("2026-12-12")
+    for (let i = 0; i < 4; i++) {
       await page.getByRole("button", { name: "Selanjutnya" }).click()
     }
     await expect(page.getByRole("link", { name: "Simpan & Kembali" })).toBeVisible({ timeout: 8000 })
@@ -79,10 +85,7 @@ test.describe("Issue #2 hardening — draft builder", () => {
     await expect(page.getByRole("button", { name: "Selanjutnya" })).toBeVisible({ timeout: 8000 })
   })
 
-  test("KNOWN GAP: wizard advances with empty fields (no per-step validation)", async ({ page }) => {
-    // Acceptance Issue #2 menuntut tiap step memvalidasi input sebelum lanjut.
-    // Test ini mendokumentasikan perilaku saat ini: kosong pun bisa maju 5 step.
-    // Kalau validasi sudah dipasang, test ini HARUS merah — hapus/perbarui saat itu.
+  test("wizard blocks next on empty required fields, advances once filled", async ({ page }) => {
     const user = await createVerifiedUser(page.request, "noval")
     await uiLogin(page, user.email, user.password)
     const tid = await templateIdByName(page.request, "Elegant Modern")
@@ -90,10 +93,15 @@ test.describe("Issue #2 hardening — draft builder", () => {
 
     await page.goto(`/dashboard/invitations/${id}`)
     await expect(page.getByText("Data Pasangan", { exact: true }).first()).toBeVisible({ timeout: 8000 })
-    for (let i = 0; i < 5; i++) {
-      await page.getByRole("button", { name: "Selanjutnya" }).click()
-    }
-    await expect(page.getByRole("link", { name: "Simpan & Kembali" })).toBeVisible({ timeout: 8000 })
+    await page.getByRole("button", { name: "Selanjutnya" }).click()
+    await expect(page.getByTestId("step-error")).toBeVisible({ timeout: 8000 })
+    await expect(page.getByRole("heading", { name: "Data Pasangan" })).toBeVisible()
+    const names = page.locator('input[placeholder="Nama lengkap"]')
+    await names.first().fill("Budi")
+    await names.nth(1).fill("Anisa")
+    await page.getByRole("button", { name: "Selanjutnya" }).click()
+    await expect(page.getByRole("heading", { name: "Detail Acara" })).toBeVisible({ timeout: 8000 })
+    await expect(page.getByTestId("step-error")).toHaveCount(0)
   })
 
   test("draft persists bride, events, loveStory, gifts via PATCH", async ({ page }) => {
@@ -108,6 +116,7 @@ test.describe("Issue #2 hardening — draft builder", () => {
         groomName: "Budi",
         loveStory: [{ date: "2020-01-01", description: "Pertemuan pertama" }],
         gifts: [{ bankName: "BCA", accountNumber: "123456", accountName: "Budi" }],
+        gallery: [{ url: "https://example.com/foto.jpg", caption: "Prewedding" }],
         events: [
           {
             title: "Akad Nikah",
@@ -129,6 +138,36 @@ test.describe("Issue #2 hardening — draft builder", () => {
     expect(inv.event?.[0]?.title).toBe("Akad Nikah")
     expect(JSON.stringify(inv.loveStory)).toContain("Pertemuan pertama")
     expect(JSON.stringify(inv.gifts)).toContain("BCA")
+    expect(inv.galleryPhotos?.[0]?.url).toBe("https://example.com/foto.jpg")
+  })
+
+  test("gallery photos added by URL persist via autosave", async ({ page }) => {
+    const user = await createVerifiedUser(page.request, "gal")
+    await uiLogin(page, user.email, user.password)
+    const tid = await templateIdByName(page.request, "Elegant Modern")
+    const id = await createInvitation(page.request, tid)
+
+    await page.goto(`/dashboard/invitations/${id}`)
+    const names = page.locator('input[placeholder="Nama lengkap"]')
+    await names.first().fill("Budi")
+    await names.nth(1).fill("Anisa")
+    await page.getByRole("button", { name: "Selanjutnya" }).click()
+    await expect(page.getByRole("heading", { name: "Detail Acara" })).toBeVisible({ timeout: 8000 })
+    await page.locator('input[type="date"]').first().fill("2026-12-12")
+    await page.getByRole("button", { name: "Selanjutnya" }).click()
+    await expect(page.getByRole("heading", { name: "Galeri Foto" })).toBeVisible({ timeout: 8000 })
+    await page.getByTestId("gallery-url").fill("https://example.com/galeri-1.jpg")
+    await page.getByTestId("gallery-caption").fill("Momen lamaran")
+    await page.getByTestId("gallery-add").click()
+    await expect(page.getByTestId("gallery-item")).toHaveCount(1, { timeout: 8000 })
+    let found = false
+    for (let i = 0; i < 10; i++) {
+      await page.waitForTimeout(1000)
+      const got = await page.request.get(`/api/invitations/${id}`)
+      const inv = (await got.json()).invitation
+      if ((inv.galleryPhotos ?? []).some((g: any) => g.url === "https://example.com/galeri-1.jpg")) { found = true; break }
+    }
+    expect(found).toBe(true)
   })
 
   test("invitations are isolated between users", async ({ page, browser }) => {

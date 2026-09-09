@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useWizard } from "./wizard-context"
 import { WizardNav } from "./wizard-nav"
 import { WizardPreview } from "./wizard-preview"
@@ -14,9 +15,24 @@ import Link from "next/link"
 const stepComponents = [CoupleStep, EventsStep, GalleryStep, LoveStoryStep, GiftsStep, SettingsStep]
 
 export function WizardLayout() {
-  const { currentStep, setCurrentStep, saveStatus, invitationId, templateName } = useWizard()
+  const { currentStep, setCurrentStep, saveStatus, validateStep, invitationId, templateName } = useWizard()
+  const [stepError, setStepError] = useState<string[] | null>(null)
 
   const StepComponent = stepComponents[currentStep]
+
+  useEffect(() => {
+    setStepError(null)
+  }, [currentStep])
+
+  function handleNext() {
+    const errors = validateStep(currentStep)
+    if (errors.length > 0) {
+      setStepError(errors)
+      return
+    }
+    setStepError(null)
+    setCurrentStep(currentStep + 1)
+  }
 
   return (
     <div>
@@ -45,6 +61,21 @@ export function WizardLayout() {
           <div className="bg-white rounded-xl border border-line p-6 mb-6 shadow-[0_2px_24px_rgba(46,42,38,0.04)]">
             <StepComponent />
 
+            {stepError && stepError.length > 0 && (
+              <div
+                data-testid="step-error"
+                role="alert"
+                className="mt-6 px-4 py-3 rounded-xl bg-maroon/10 border border-maroon/30 text-sm text-maroon"
+              >
+                <p className="font-semibold mb-1">Lengkapi dulu sebelum lanjut:</p>
+                <ul className="list-disc list-inside space-y-0.5">
+                  {stepError.map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="flex justify-between mt-8 pt-5 border-t border-line">
               <button
                 onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
@@ -56,7 +87,7 @@ export function WizardLayout() {
 
               {currentStep < 5 ? (
                 <button
-                  onClick={() => setCurrentStep(currentStep + 1)}
+                  onClick={handleNext}
                   className="px-5 py-2.5 text-sm font-semibold text-white bg-maroon hover:bg-maroon-deep rounded-xl transition-colors shadow-sm"
                 >
                   Selanjutnya
