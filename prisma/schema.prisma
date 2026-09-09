@@ -73,9 +73,15 @@ model Invitation {
   templateId    String?          @map("template_id")
   status        InvitationStatus @default(DRAFT)
   themeConfig   Json?            @map("theme_config")
+  coverImageUrl String?          @map("cover_image_url")
+  groomName     String?          @map("groom_name")
+  brideName     String?          @map("bride_name")
+  groomFather   String?          @map("groom_father")
+  groomMother   String?          @map("groom_mother")
+  brideFather   String?          @map("bride_father")
+  brideMother   String?          @map("bride_mother")
   loveStory     Json?
   gifts         Json?
-  events        Json?
   userId        String           @map("user_id")
   createdAt     DateTime         @default(now()) @map("created_at")
   updatedAt     DateTime         @updatedAt @map("updated_at")
@@ -93,8 +99,12 @@ model Event {
   id           String     @id @default(cuid())
   title        String
   date         DateTime
+  timeStart    DateTime?  @map("time_start")
+  timeEnd      DateTime?  @map("time_end")
   location     String?
   address      String?
+  mapsUrl      String?    @map("maps_url")
+  sortOrder    Int        @default(0) @map("sort_order")
   invitationId String     @map("invitation_id")
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now()) @map("created_at")
@@ -107,6 +117,7 @@ model GalleryPhoto {
   id           String     @id @default(cuid())
   url          String
   caption      String?
+  sortOrder    Int        @default(0) @map("sort_order")
   invitationId String     @map("invitation_id")
   invitation   Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
   createdAt    DateTime   @default(now()) @map("created_at")
