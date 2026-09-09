@@ -1,4 +1,47 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+
 export default function SignUp() {
+  const router = useRouter()
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setError("")
+    setSuccess("")
+    setLoading(true)
+
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Gagal mendaftar")
+        setLoading(false)
+        return
+      }
+
+      setSuccess("Akun dibuat! Cek console untuk link verifikasi (dev mode).")
+      setLoading(false)
+    } catch {
+      setError("Terjadi kesalahan, coba lagi")
+      setLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -11,7 +54,17 @@ export default function SignUp() {
       </div>
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6">
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-sm text-green-700">
+              {success}
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Alamat Email
@@ -33,35 +86,28 @@ export default function SignUp() {
                 name="password"
                 type="password"
                 required
+                minLength={8}
                 className="mt-1 appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               />
+              <p className="mt-1 text-xs text-gray-500">Minimal 8 karakter</p>
             </div>
             <div>
               <button
                 type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                disabled={loading}
+                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                Daftar
+                {loading ? "Mendaftar..." : "Daftar"}
               </button>
             </div>
           </form>
           <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">atau</span>
-              </div>
-            </div>
-            <div className="mt-6">
-              <p className="mt-2 text-center text-sm text-gray-600">
-                Sudah punya akun?{' '}
-                <a href="/sign-in" className="font-medium text-indigo-600 hover:text-indigo-500">
-                  Masuk di sini
-                </a>
-              </p>
-            </div>
+            <p className="mt-2 text-center text-sm text-gray-600">
+              Sudah punya akun?{" "}
+              <a href="/sign-in" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Masuk di sini
+              </a>
+            </p>
           </div>
         </div>
       </div>
