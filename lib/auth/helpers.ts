@@ -88,15 +88,24 @@ export async function checkSignThrottle(
   ip: string
 ): Promise<{ canSignUp: boolean; message?: string }> {
   const now = new Date()
-  const windowStart = new Date(now.getTime() - 60 * 60 * 1000)
+  const resetAt = new Date(now.getTime() + 60 * 60 * 1000)
 
-  const existing = await prisma.signThrottle.findFirst({
-    where: { ip, createdAt: { gt: windowStart } }
+  const existing = await prisma.signThrottle.findUnique({
+    where: { ip }
   })
 
   if (!existing) {
     await prisma.signThrottle.create({
-      data: { ip, count: 1, resetAt: new Date(now.getTime() + 60 * 60 * 1000) }
+      data: { ip, count: 1, resetAt }
+    })
+    return { canSignUp: true }
+  }
+
+  // window sudah lewat → reset counter
+  if (existing.resetAt <= now) {
+    await prisma.signThrottle.update({
+      where: { ip },
+      data: { count: 1, resetAt }
     })
     return { canSignUp: true }
   }
@@ -106,7 +115,7 @@ export async function checkSignThrottle(
   }
 
   await prisma.signThrottle.update({
-    where: { id: existing.id },
+    where: { ip },
     data: { count: existing.count + 1 }
   })
 
@@ -133,4 +142,5 @@ export async function isAccountLocked(userId: string): Promise<boolean> {
 
   return false
 }
+
 
