@@ -13,10 +13,12 @@ export function WizardPreview() {
       style={{ backgroundColor: theme.backgroundColor || "#ffffff" }}
     >
       <div
+        data-testid="wizard-preview-header"
         className="p-6 text-center"
         style={{ backgroundColor: theme.primaryColor || "#8AA69B" }}
       >
         <h2
+          data-testid="wizard-preview-names"
           className="text-xl text-white mb-1"
           style={{ fontFamily: theme.fontFamily || "var(--font-display)" }}
         >

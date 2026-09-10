@@ -6,13 +6,15 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({ req: request })
   const { pathname } = request.nextUrl
 
-  const isPublicPath = pathname === "/sign-in" || pathname === "/sign-up" || pathname === "/forgot-password" || pathname === "/reset-password"
+  const isAuthPath = pathname === "/sign-in" || pathname === "/sign-up" || pathname === "/forgot-password" || pathname === "/reset-password"
+  const isPublicInvitation = pathname === "/" || pathname.startsWith("/u/")
+  const isPublicPath = isAuthPath || isPublicInvitation
 
   if (!token && !isPublicPath) {
     return NextResponse.redirect(new URL("/sign-in", request.url))
   }
 
-  if (token && isPublicPath) {
+  if (token && isAuthPath) {
     return NextResponse.redirect(new URL("/dashboard", request.url))
   }
 

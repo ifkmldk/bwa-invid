@@ -19,9 +19,13 @@ export function generateToken(): string {
   return crypto.randomBytes(32).toString("hex")
 }
 
+export function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex")
+}
+
 export async function createVerificationToken(userId: string): Promise<string> {
   const token = generateToken()
-  const tokenHash = await bcrypt.hash(token, 12)
+  const tokenHash = hashToken(token)
   const expiresAt = new Date(Date.now() + EMAIL_VERIFICATION_TOKEN_TTL)
 
   // userId unik: hapus yang lama (misal resend verification)
@@ -35,7 +39,7 @@ export async function createVerificationToken(userId: string): Promise<string> {
 
 export async function createPasswordResetToken(userId: string): Promise<string> {
   const token = generateToken()
-  const tokenHash = await bcrypt.hash(token, 12)
+  const tokenHash = hashToken(token)
   const expiresAt = new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL)
 
   // userId unik: hapus yang lama sebelum buat baru (regenerasi)
@@ -52,40 +56,29 @@ export async function verifyToken(
   tokenModel: "verification" | "passwordReset"
 ): Promise<{ valid: boolean; userId?: string }> {
   const now = new Date()
+  const tokenHash = hashToken(token)
 
   if (tokenModel === "verification") {
-    const tokens = await prisma.verificationToken.findMany({
-      where: { usedAt: null, expiresAt: { gt: now } }
+    const t = await prisma.verificationToken.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
     })
-
-    for (const t of tokens) {
-      const isValid = await bcrypt.compare(token, t.tokenHash)
-      if (isValid) {
-        await prisma.verificationToken.update({
-          where: { id: t.id },
-          data: { usedAt: now }
-        })
-        return { valid: true, userId: t.userId }
-      }
-    }
+    if (!t) return { valid: false }
+    await prisma.verificationToken.update({
+      where: { id: t.id },
+      data: { usedAt: now },
+    })
+    return { valid: true, userId: t.userId }
   } else {
-    const tokens = await prisma.passwordResetToken.findMany({
-      where: { usedAt: null, expiresAt: { gt: now } }
+    const t = await prisma.passwordResetToken.findFirst({
+      where: { tokenHash, usedAt: null, expiresAt: { gt: now } },
     })
-
-    for (const t of tokens) {
-      const isValid = await bcrypt.compare(token, t.tokenHash)
-      if (isValid) {
-        await prisma.passwordResetToken.update({
-          where: { id: t.id },
-          data: { usedAt: now }
-        })
-        return { valid: true, userId: t.userId }
-      }
-    }
+    if (!t) return { valid: false }
+    await prisma.passwordResetToken.update({
+      where: { id: t.id },
+      data: { usedAt: now },
+    })
+    return { valid: true, userId: t.userId }
   }
-
-  return { valid: false }
 }
 
 export async function checkSignThrottle(

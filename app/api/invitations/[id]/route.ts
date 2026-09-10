@@ -55,14 +55,29 @@ export async function PATCH(
       return NextResponse.json({ error: "Undangan tidak ditemukan" }, { status: 404 })
     }
 
-    const { events, ...fields } = body
+    const { events, gallery, loveStory, gifts, ...fields } = body
+
+    // themeConfig dikunci dari template saat create; slug/status hanya lewat
+    // endpoint publish/unpublish. Field di luar whitelist diabaikan agar
+    // end-user tidak bisa mengoverride tema atau status seenaknya.
+    const ALLOWED_FIELDS = [
+      "groomName",
+      "brideName",
+      "groomFather",
+      "groomMother",
+      "brideFather",
+      "brideMother",
+      "coverImageUrl",
+    ] as const
 
     const updateData: any = {}
-    for (const [key, value] of Object.entries(fields)) {
-      if (value !== undefined) {
-        updateData[key] = value
+    for (const key of ALLOWED_FIELDS) {
+      if (fields[key] !== undefined) {
+        updateData[key] = fields[key]
       }
     }
+    if (loveStory !== undefined) updateData.loveStory = loveStory
+    if (gifts !== undefined) updateData.gifts = gifts
 
     const invitation = await prisma.invitation.update({
       where: { id },
@@ -85,6 +100,23 @@ export async function PATCH(
             sortOrder: index,
             invitationId: id,
           })),
+        })
+      }
+    }
+
+    if (gallery && Array.isArray(gallery)) {
+      await prisma.galleryPhoto.deleteMany({ where: { invitationId: id } })
+
+      if (gallery.length > 0) {
+        await prisma.galleryPhoto.createMany({
+          data: gallery
+            .filter((photo: any) => photo && typeof photo.url === "string" && photo.url.trim())
+            .map((photo: any, index: number) => ({
+              url: photo.url.trim(),
+              caption: typeof photo.caption === "string" && photo.caption.trim() ? photo.caption.trim() : null,
+              sortOrder: index,
+              invitationId: id,
+            })),
         })
       }
     }
